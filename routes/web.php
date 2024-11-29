@@ -49,11 +49,12 @@ Route::group(['middleware' => 'firebase.auth'], function () {
     //mahasiswa
     Route::get('/mahasiswa', [MahasiswaController::class, 'index'])->name('mahasiswa.index');
     Route::post('/mahasiswa', [MahasiswaController::class, 'store'])->name('mahasiswa.store');
-    Route::put('/mahasiswa/{id}', [MahasiswaController::class, 'update'])->name('mahasiswa.update');
-    Route::delete('/mahasiswa/{id}', [MahasiswaController::class, 'destroy'])->name('mahasiswa.destroy');
+    Route::put('/mahasiswa/{uid}', [MahasiswaController::class, 'update'])->name('mahasiswa.update');
+    Route::delete('/mahasiswa/{uid}', [MahasiswaController::class, 'destroy'])->name('mahasiswa.destroy');
     
     //pengelola
     Route::get('/pengelola', [PengelolaController::class, 'index'])->name('pengelola.index');
+    Route::post('/pengelola', [PengelolaController::class, 'store'])->name('pengelola.store');
     
     //onBoard
     Route::get('/onBoard', [OnboardController::class, 'indexOnBoard'])->name('onBoard.index');

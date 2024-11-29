@@ -9,6 +9,7 @@ use Kreait\Firebase\Database;
 use Google\Cloud\Firestore\FirestoreClient;
 use Kreait\Firebase\Storage;
 use Kreait\Firebase\Exception\Auth\EmailExists;
+use Google\Cloud\Core\Timestamp;
 use Exception;
 
 class MahasiswaController extends Controller
@@ -62,7 +63,7 @@ class MahasiswaController extends Controller
                 'password' => $request->password,
                 'emailVerified' => false,
             ]);
-            dd($userAuth);
+            // dd($userAuth);
 
             // 2. Upload gambar jika ada
             $imageUrl = '';
@@ -86,17 +87,20 @@ class MahasiswaController extends Controller
                 );
             }
 
+            $lastName = $request->lastName ?? '';
+
             $userData = [
-                'createdAt' => date('Y-m-d H:i:s'),
+                'createdAt' => new Timestamp(new \DateTime()),
                 'email' => $request->email,
                 'firstName' => $request->firstName,
                 'imageUrl' => $imageUrl,
-                'lastName' => $request->lastName,
-                'lastSeen' => null,
+                'lastName' => $lastName,
+                'lastSeen' => new Timestamp(new \DateTime()),
                 'name' => $request->firstName . ' ' . $request->lastName,
                 'role' => 'user',
-                'updatedAt' => date('Y-m-d H:i:s')
+                'updatedAt' => new Timestamp(new \DateTime())
             ];
+            // dd($userData);
 
             // 4. Simpan ke Firestore menggunakan UID dari Auth
             $this->collection->document($userAuth->uid)->set($userData);
@@ -109,21 +113,33 @@ class MahasiswaController extends Controller
         }
     }
 
-    public function destroy($id)
+    public function destroy($uid)
     {
         try {
-            // Hapus foto profil dari Storage jika ada
-            $document = $this->collection->document($id)->snapshot();
-            if ($document->exists() && !empty($document->data()['imageUrl'])) {
-                $path = parse_url($document->data()['imageUrl'], PHP_URL_PATH);
-                $this->bucket->object(ltrim($path, '/'))->delete();
+            // 1. Dapatkan dokumen pengguna dari Firestore berdasarkan UID
+            $userDocument = $this->collection->document($uid);
+            $existingData = $userDocument->snapshot();
+
+            if (!$existingData->exists()) {
+                return redirect()->back()->with('error', 'Pengguna tidak ditemukan');
             }
 
-            // Hapus user dari Authentication
-            $this->auth->deleteUser($id);
-            
-            // Hapus document dari Firestore
-            $this->collection->document($id)->delete();
+            // 2. Hapus gambar profil dari Firebase Storage jika ada
+            if (!empty($existingData['imageUrl'])) {
+                $imagePath = parse_url($existingData['imageUrl'], PHP_URL_PATH);
+                $bucketPath = urldecode(substr($imagePath, strpos($imagePath, '/o/') + 3));
+                
+                $this->bucket->object($bucketPath)->delete(); // Hapus file gambar dari bucket
+            }
+
+            // 3. Hapus dokumen pengguna dari Firestore
+            $userDocument->delete();
+
+            // 4. Hapus pengguna dari Firebase Authentication
+            $userAuth = $this->auth->getUser($uid);  // Mendapatkan user berdasarkan UID
+            if ($userAuth) {
+                $this->auth->deleteUser($uid);  // Menghapus user dari Firebase Auth
+            }
 
             return redirect()->route('mahasiswa.index')->with('success', 'Mahasiswa berhasil dihapus');
         } catch (Exception $e) {
@@ -131,63 +147,70 @@ class MahasiswaController extends Controller
         }
     }
 
-    public function update(Request $request, $id)
+
+    public function update(Request $request, $uid)
     {
         try {
+            // Validasi input
             $request->validate([
                 'firstName' => 'required',
-                'lastName' => 'required',
-                'email' => 'required|email',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048'
+                'lastName' => 'nullable',
+                'image' => 'image|mimes:jpeg,png,jpg|max:2048' // Validasi untuk gambar
             ]);
 
-            // Update email di Authentication jika berubah
-            $userRecord = $this->auth->getUser($id);
-            if ($userRecord->email !== $request->email) {
-                $this->auth->updateUser($id, ['email' => $request->email]);
+            // 1. Dapatkan dokumen pengguna dari Firestore berdasarkan UID
+            $userDocument = $this->collection->document($uid);
+            $existingData = $userDocument->snapshot();
+
+            if (!$existingData->exists()) {
+                return redirect()->back()->with('error', 'Pengguna tidak ditemukan');
             }
 
-            // Update password jika ada
-            if ($request->filled('password')) {
-                $this->auth->updateUser($id, ['password' => $request->password]);
-            }
-
-            // Handle image update
-            $userData = [
-                'email' => $request->email,
-                'firstName' => $request->firstName,
-                'lastName' => $request->lastName,
-                'name' => $request->firstName . ' ' . $request->lastName,
-                'updatedAt' => round(microtime(true) * 1000)
-            ];
-
+            // 2. Perbarui gambar jika ada
+            $imageUrl = $existingData['imageUrl'] ?? ''; // Gunakan URL gambar lama jika tidak ada penggantian
             if ($request->hasFile('image')) {
-                // Hapus foto lama jika ada
-                $document = $this->collection->document($id)->snapshot();
-                if ($document->exists() && !empty($document->data()['imageUrl'])) {
-                    $path = parse_url($document->data()['imageUrl'], PHP_URL_PATH);
-                    $this->bucket->object(ltrim($path, '/'))->delete();
-                }
-
-                // Upload foto baru
                 $image = $request->file('image');
                 $imageName = time() . '.' . $image->getClientOriginalExtension();
-                $path = 'profile_images/' . $id . '/' . $imageName;
-                
+                $path = 'profile_images/' . $uid . '/' . $imageName;
+
                 $imageObject = $this->bucket->upload(
                     file_get_contents($image->getRealPath()),
                     ['name' => $path]
                 );
 
-                $userData['imageUrl'] = 'https://firebasestorage.googleapis.com/v0/b/%s/o/%s?alt=media' . $this->bucket->name() . '/' . $path;
+                // Dapatkan URL gambar
+                $imageUrl = sprintf(
+                    'https://firebasestorage.googleapis.com/v0/b/%s/o/%s?alt=media',
+                    $this->bucket->info()['name'],
+                    urlencode($path)
+                );
             }
 
-            // Update data di Firestore
-            $this->collection->document($id)->update($userData);
+            // Set nilai default untuk `lastName` jika tidak diisi
+            $lastName = $request->lastName ?? '';
 
-            return redirect()->route('mahasiswa.index')->with('success', 'Data mahasiswa berhasil diperbarui');
+            // 3. Siapkan data yang akan diperbarui
+            $updatedData = [
+                'firstName' => $request->firstName,
+                'imageUrl' => $imageUrl,
+                'lastName' => $lastName,
+                'name' => $request->firstName . ' ' . $lastName,
+                'updatedAt' => new Timestamp(new \DateTime()), // Perbarui waktu
+            ];
+
+            // 4. Perbarui dokumen di Firestore
+            $userDocument->update(
+                array_map(
+                    fn($key, $value) => ['path' => $key, 'value' => $value],
+                    array_keys($updatedData),
+                    $updatedData
+                )
+            );
+
+            return redirect()->route('mahasiswa.index')->with('success', 'Mahasiswa berhasil diperbarui');
         } catch (Exception $e) {
             return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
     }
+
 }

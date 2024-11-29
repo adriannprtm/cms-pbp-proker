@@ -65,7 +65,7 @@
         class="d-flex flex-column flex-md-row text-center text-md-start justify-content-between py-4 px-4 px-xl-5 bg-primary">
         <!-- Copyright -->
         <div class="text-white mb-3 mb-md-0">
-            Copyright © 2024. Aldi Maulana Putra.
+            Copyright © 2024. Kelompok 3 D4-2B.
         </div>
         <!-- Copyright -->
     </div>

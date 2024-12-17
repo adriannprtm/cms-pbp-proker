@@ -11,6 +11,7 @@ use Kreait\Firebase\Storage;
 use Kreait\Firebase\Exception\Auth\EmailExists;
 use Google\Cloud\Core\Timestamp;
 use Exception;
+use Alert;
 
 class MahasiswaController extends Controller
 {
@@ -113,37 +114,44 @@ class MahasiswaController extends Controller
         }
     }
 
-    public function destroy($uid)
+    public function destroy($id)
     {
         try {
-            // 1. Dapatkan dokumen pengguna dari Firestore berdasarkan UID
-            $userDocument = $this->collection->document($uid);
-            $existingData = $userDocument->snapshot();
-
-            if (!$existingData->exists()) {
-                return redirect()->back()->with('error', 'Pengguna tidak ditemukan');
-            }
-
-            // 2. Hapus gambar profil dari Firebase Storage jika ada
-            if (!empty($existingData['imageUrl'])) {
-                $imagePath = parse_url($existingData['imageUrl'], PHP_URL_PATH);
-                $bucketPath = urldecode(substr($imagePath, strpos($imagePath, '/o/') + 3));
+            $document = $this->collection->document($id);
+            $data = $document->snapshot();
+            
+            if ($data->exists()) {
+                $bannerData = $data->data();
                 
-                $this->bucket->object($bucketPath)->delete(); // Hapus file gambar dari bucket
+                // Hapus gambar dari storage jika ada
+                if (isset($bannerData['imageUrl'])) {
+                    try {
+                        // Extract filename from the full URL
+                        $imageUrl = $bannerData['imageUrl'];
+                        $imagePath = 'profile_images/' . basename(parse_url($imageUrl, PHP_URL_PATH));
+                        
+                        $object = $this->bucket->object($imagePath);
+                        if ($object->exists()) {
+                            $object->delete();
+                        }
+                    } catch (\Exception $e) {
+                        \Log::error('Error deleting image: ' . $e->getMessage());
+                    }
+                }
+                
+                // Hapus document dari Firestore
+                $document->delete();
+                
+                Alert::success('Sukses', 'Data Berhasil Dihapus');
+                return redirect('/mahasiswa');
             }
-
-            // 3. Hapus dokumen pengguna dari Firestore
-            $userDocument->delete();
-
-            // 4. Hapus pengguna dari Firebase Authentication
-            $userAuth = $this->auth->getUser($uid);  // Mendapatkan user berdasarkan UID
-            if ($userAuth) {
-                $this->auth->deleteUser($uid);  // Menghapus user dari Firebase Auth
-            }
-
-            return redirect()->route('mahasiswa.index')->with('success', 'Mahasiswa berhasil dihapus');
-        } catch (Exception $e) {
-            return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+            
+            Alert::error('Gagal', 'Data Tidak Ditemukan');
+            return redirect()->back();
+        } catch (\Exception $e) {
+            \Log::error('Banner delete error: ' . $e->getMessage());
+            Alert::error('Gagal', 'Data Gagal Dihapus');
+            return redirect()->back();
         }
     }
 

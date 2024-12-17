@@ -41,8 +41,8 @@
                     <td>{{ $pengelola['email'] }}</td>
                     <td>{{ $pengelola['name'] }}</td>
                     <td class="text-center">
-                        <a href="" class="btn btn-warning btn-sm">Edit</a>
-                        <button type="submit" class="btn btn-sm btn-danger">Hapus</button>
+                        <button type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#editModal{{ $pengelola['id'] }}">Edit</button>
+                        <button type="button" class="btn btn-danger btn-sm" data-toggle="modal" data-target="#deleteModal{{ $pengelola['id'] }}">Hapus</button>
                     </td>
                 </tr>
                 @endforeach
@@ -93,4 +93,87 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Edit -->
+@foreach($pengelolas as $pengelola)
+    <div class="modal fade" id="editModal{{ $pengelola['id'] }}" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title" id="exampleModalLongTitle">Edit Banner</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form action="/pengelola/{{ $pengelola['id'] }}" method="post" enctype="multipart/form-data">
+                @csrf
+                @method('PUT')
+                
+                <div class="mb-3">
+                    <label for="nama" class="form-label">Nama Depan</label>
+                    <input type="text" name="firstName" id="firstName" value="{{ $pengelola['firstName'] }}" class="form-control @error('firstName') is-invalid @enderror">
+                    @error('firstName')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="mb-3">
+                    <label for="nama" class="form-label">Nama Belakang</label>
+                    <input type="text" name="lastName" id="lastName" value="{{ $pengelola['lastName'] }}" class="form-control @error('lastName') is-invalid @enderror">
+                    @error('lastName')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="mb-3">
+                    <label for="imageUrl" class="form-label">Foto Profil</label>
+                    <input type="file" class="form-control-file @error('imageUrl') is-invalid @enderror" accept="image/*" id="imageUrl" name="image">
+                    <small class="form-text text-muted">Upload foto dengan format JPG, JPEG, atau PNG (max: 2MB)</small>
+                    @error('imageUrl')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    @if(isset($pengelola['imageUrl']))
+                        <img src="{{$pengelola['imageUrl']}}" alt="Current pengelola Image" style="max-height: 100px;" class="img-thumbnail">
+                    @else
+                        <p>No Image</p>
+                    @endif
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </form>
+        </div>
+        </div>
+    </div>
+    </div>
+@endforeach
+
+@foreach($pengelolas as $pengelola)
+<!-- Modal Delete-->
+<div class="modal fade" id="deleteModal{{ $pengelola['id'] }}" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Hapus Pengelola</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="{{ route('pengelola.destroy', $pengelola['id']) }}" method="POST">
+                @csrf
+                @method('DELETE')
+                <div class="modal-body">
+                    <span>Apakah Anda Yakin Ingin Menghapus Data Ini?</span>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-danger">Hapus</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endforeach
 @endsection

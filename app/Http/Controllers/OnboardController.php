@@ -207,4 +207,45 @@ class OnboardController extends Controller
                 ->withInput();
         }
     }
+
+    public function destroyOnBoard($id)
+    {
+        try {
+            $document = $this->onBoardCollection->document($id);
+            $data = $document->snapshot();
+            
+            if ($data->exists()) {
+                $bannerData = $data->data();
+                
+                // Hapus gambar dari storage jika ada
+                if (isset($bannerData['gambar'])) {
+                    try {
+                        // Extract filename from the full URL
+                        $imageUrl = $bannerData['gambar'];
+                        $imagePath = 'Image/OnBoarding/' . basename(parse_url($imageUrl, PHP_URL_PATH));
+                        
+                        $object = $this->bucket->object($imagePath);
+                        if ($object->exists()) {
+                            $object->delete();
+                        }
+                    } catch (\Exception $e) {
+                        \Log::error('Error deleting image: ' . $e->getMessage());
+                    }
+                }
+                
+                // Hapus document dari Firestore
+                $document->delete();
+                
+                Alert::success('Sukses', 'Data Berhasil Dihapus');
+                return redirect('/onBoard');
+            }
+            
+            Alert::error('Gagal', 'Data Tidak Ditemukan');
+            return redirect()->back();
+        } catch (\Exception $e) {
+            \Log::error('Banner delete error: ' . $e->getMessage());
+            Alert::error('Gagal', 'Data Gagal Dihapus');
+            return redirect()->back();
+        }
+    }
 }

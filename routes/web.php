@@ -55,11 +55,14 @@ Route::group(['middleware' => 'firebase.auth'], function () {
     //pengelola
     Route::get('/pengelola', [PengelolaController::class, 'index'])->name('pengelola.index');
     Route::post('/pengelola', [PengelolaController::class, 'store'])->name('pengelola.store');
+    Route::put('/pengelola/{uid}', [PengelolaController::class, 'update'])->name('pengelola.update');
+    Route::delete('/pengelola/{uid}', [PengelolaController::class, 'destroy'])->name('pengelola.destroy');
     
     //onBoard
     Route::get('/onBoard', [OnboardController::class, 'indexOnBoard'])->name('onBoard.index');
     Route::post('/onBoard', [OnboardController::class, 'storeOnBoard'])->name('onBoard.store');
     Route::put('/onBoard/{id}', [OnboardController::class, 'updateOnBoard'])->name('onBoard.update');
+    Route::delete('/onBoard/{id}', [OnboardController::class, 'destroyOnBoard'])->name('onBoard.destroy');
 
     //category event
     Route::get('/categoryEvent', [CategoryeventController::class, 'index'])->name('categoryEvent.index');

@@ -49,7 +49,15 @@
                     </td>
                     <td>{{ $onBoard['description'] }}</td>
                     <td class="text-center">{{ $onBoard['status'] }}</td>
-                    <td class="text-center"><button type="button" class="btn btn-primary mb-3" data-toggle="modal" data-target="#editModal{{ $onBoard['id'] }}">Ubah</button></td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-primary" data-toggle="modal" data-target="#editModal{{ $onBoard['id'] }}">Ubah</button>
+                        <form action="{{ url('/onBoard/'.$onBoard['id']) }}" method="POST" 
+                              class="d-inline" onsubmit="return confirm('Yakin ingin menghapus?')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-sm btn-danger">Hapus</button>
+                        </form>
+                    </td>
                 </tr>
                 @endforeach
             </tbody>

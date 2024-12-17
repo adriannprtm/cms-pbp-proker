@@ -49,8 +49,8 @@
                     </td>
                     <td>{{ $mahasiswa['email'] }}</td>
                     <td class="text-center">
-                    <button type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#editModal{{ $mahasiswa['id'] }}">Edit</button>
-                    <button type="button" class="btn btn-danger btn-sm" data-toggle="modal" data-target="#deleteModal{{ $mahasiswa['id'] }}">Hapus</button>
+                        <button type="button" class="btn btn-warning btn-sm" data-toggle="modal" data-target="#editModal{{ $mahasiswa['id'] }}">Edit</button>
+                        <button type="button" class="btn btn-danger btn-sm" data-toggle="modal" data-target="#deleteModal{{ $mahasiswa['id'] }}">Hapus</button>
                     </td>
                 </tr>
                 @endforeach

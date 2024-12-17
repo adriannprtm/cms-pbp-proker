@@ -117,7 +117,8 @@ class BannerController extends Controller
             $data = $document->snapshot();
 
             if (!$data->exists()) {
-                return redirect()->back()->with('error', 'Banner tidak ditemukan');
+                Alert::error('Gagal', 'Banner tidak ditemukan');
+                return redirect()->back();
             }
 
             // Validasi input
@@ -141,19 +142,33 @@ class BannerController extends Controller
             if ($request->hasFile('gambar')) {
                 // Menghapus gambar lama jika ada
                 if (isset($currentData['gambar'])) {
-                    // Ekstrak path dari URL lama jika formatnya berupa public URL
-                    $oldPath = parse_url($currentData['gambar'], PHP_URL_PATH);
-                    $decodedPath = urldecode($oldPath); // Decoding untuk mendapatkan path aslinya
-                    $oldObject = $this->bucket->object(ltrim($decodedPath, '/')); // Ltrim untuk menghapus karakter "/"
-                    if ($oldObject->exists()) {
-                        $oldObject->delete();
+                    try {
+                        $oldImageUrl = $currentData['gambar'];
+                        // Mendapatkan nama file dari URL
+                        $oldFileName = basename(parse_url($oldImageUrl, PHP_URL_PATH));
+                        // Decode nama file karena mungkin ada karakter yang di-encode
+                        $oldFileName = urldecode($oldFileName);
+                        // Membuat path lengkap
+                        $oldImagePath = 'Image/Banner/' . $oldFileName;
+                        
+                        \Log::info('Attempting to delete old image: ' . $oldImagePath);
+                        
+                        $oldObject = $this->bucket->object($oldImagePath);
+                        if ($oldObject->exists()) {
+                            $oldObject->delete();
+                            \Log::info('Old image deleted successfully');
+                        }
+                    } catch (\Exception $e) {
+                        \Log::error('Error deleting old image: ' . $e->getMessage());
                     }
                 }
 
-                // Mengupload gambar baru
+                // Upload gambar baru
                 $image = $request->file('gambar');
                 $imageName = time() . '_' . $image->getClientOriginalName();
                 $imagePath = 'Image/Banner/' . $imageName;
+                
+                \Log::info('Uploading new image: ' . $imagePath);
                 
                 $imageStream = fopen($image->getRealPath(), 'r');
                 $object = $this->bucket->upload($imageStream, [
@@ -166,11 +181,12 @@ class BannerController extends Controller
                 // Generate public URL
                 $publicUrl = sprintf(
                     'https://firebasestorage.googleapis.com/v0/b/%s/o/%s?alt=media',
-                    $this->bucket->info()['name'], // Nama bucket Firebase
-                    urlencode($imagePath)         // Path gambar (di-encode)
+                    $this->bucket->info()['name'],
+                    urlencode($imagePath)
                 );
 
-                $updateData['gambar'] = $publicUrl; // Simpan URL publik ke Firestore
+                $updateData['gambar'] = $publicUrl;
+                \Log::info('New image URL: ' . $publicUrl);
             }
 
             // Update dokumen di Firestore
@@ -180,9 +196,9 @@ class BannerController extends Controller
             return redirect('/banner');
         } catch (\Exception $e) {
             \Log::error('Banner update error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
             Alert::error('Gagal', 'Data Gagal Diubah');
-            return redirect()->back()
-                ->withInput();
+            return redirect()->back()->withInput();
         }
     }
 
@@ -194,21 +210,35 @@ class BannerController extends Controller
             $data = $document->snapshot();
             
             if ($data->exists()) {
+                $bannerData = $data->data();
+                
                 // Hapus gambar dari storage jika ada
-                if (isset($data['gambar'])) {
-                    $object = $this->bucket->object($data['gambar']);
-                    if ($object->exists()) {
-                        $object->delete();
+                if (isset($bannerData['gambar'])) {
+                    try {
+                        // Extract filename from the full URL
+                        $imageUrl = $bannerData['gambar'];
+                        $imagePath = 'Image/Banner/' . basename(parse_url($imageUrl, PHP_URL_PATH));
+                        
+                        $object = $this->bucket->object($imagePath);
+                        if ($object->exists()) {
+                            $object->delete();
+                        }
+                    } catch (\Exception $e) {
+                        \Log::error('Error deleting image: ' . $e->getMessage());
                     }
                 }
                 
                 // Hapus document dari Firestore
                 $document->delete();
+                
+                Alert::success('Sukses', 'Data Berhasil Dihapus');
+                return redirect('/banner');
             }
             
-            Alert::success('Sukses', 'Data Berhasil Dihapus');
-            return redirect('/banner');
+            Alert::error('Gagal', 'Data Tidak Ditemukan');
+            return redirect()->back();
         } catch (\Exception $e) {
+            \Log::error('Banner delete error: ' . $e->getMessage());
             Alert::error('Gagal', 'Data Gagal Dihapus');
             return redirect()->back();
         }
